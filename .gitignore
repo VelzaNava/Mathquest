@@ -2,6 +2,7 @@
 # AI / IDE assistant artifacts (excluded)
 # =================================================================
 .claude/
+.claire/
 .sixth/
 .cursor/
 .aider*

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -41,8 +42,10 @@ import com.mathquest.app.ui.theme.Baloo2
 import com.mathquest.app.ui.theme.Nunito
 import com.mathquest.app.ui.theme.TextDark
 
-private const val LOGIN_PANEL_ASPECT = 823f / 945f
-private const val START_BTN_ASPECT = 538f / 121f
+// bg_login_v2.png is 1920×1080 (landscape canvas, portrait notebook paper centred within it).
+// Pixel-measured input box: topFrac=0.424  leftFrac=0.445  rightPadFrac=0.409  heightFrac=0.050
+private const val LOGIN_PANEL_ASPECT = 1920f / 1080f
+private const val START_BTN_ASPECT   = 538f  / 121f
 
 @Composable
 fun LoginScreen(
@@ -52,66 +55,62 @@ fun LoginScreen(
     var name by remember { mutableStateOf("") }
 
     Box(modifier = Modifier.fillMaxSize()) {
+
+        // Full-bleed world background — no dark overlay
         Image(
             painter = painterResource(id = R.drawable.bg_main_menu),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
         )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.45f))
-        )
 
         BoxWithConstraints(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            // Aspect-locked panel sizing
-            val maxPanelHeight = maxHeight * 0.95f
-            val maxPanelWidth = maxWidth * 0.55f
-            val panelWidth: androidx.compose.ui.unit.Dp
-            val panelHeight: androidx.compose.ui.unit.Dp
-            if (maxPanelWidth / maxPanelHeight < LOGIN_PANEL_ASPECT) {
-                panelWidth = maxPanelWidth
-                panelHeight = panelWidth / LOGIN_PANEL_ASPECT
+            // Panel fills as much of the screen as possible while keeping the 16:9 ratio
+            val maxPanelH = maxHeight * 0.96f
+            val maxPanelW = maxWidth  * 0.96f
+            val panelW: androidx.compose.ui.unit.Dp
+            val panelH: androidx.compose.ui.unit.Dp
+            if (maxPanelW / maxPanelH < LOGIN_PANEL_ASPECT) {
+                panelW = maxPanelW
+                panelH = panelW / LOGIN_PANEL_ASPECT
             } else {
-                panelHeight = maxPanelHeight
-                panelWidth = panelHeight * LOGIN_PANEL_ASPECT
+                panelH = maxPanelH
+                panelW = panelH * LOGIN_PANEL_ASPECT
             }
 
             Box(
                 modifier = Modifier
-                    .width(panelWidth)
-                    .height(panelHeight)
+                    .width(panelW)
+                    .height(panelH)
             ) {
-                // Asset background
+                // The PNG has a transparent canvas — notebook paper floats over the world bg
                 Image(
-                    painter = painterResource(id = R.drawable.bg_login_window),
-                    contentDescription = "Login Window",
+                    painter = painterResource(id = R.drawable.bg_login_v2),
+                    contentDescription = "Login Panel",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit
                 )
 
-                // === Sequential layout — guaranteed in-order vertical positioning ===
+                // Overlay elements anchored by pixel-fraction measurements
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Top spacer — clears HELLO! and decorations, lands on the Enter Name box
-                    Spacer(modifier = Modifier.height(panelHeight * 0.385f))
+                    // Clears HELLO! and lands exactly on the top of the drawn input box
+                    Spacer(modifier = Modifier.height(panelH * 0.424f))
 
-                    // Text field — sits exactly inside the Enter Name pencil rectangle
-                    // Half the previous length: now ~24% of panel width, centered
+                    // Text field — sits directly inside the pencil-drawn rectangle in the PNG
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(
-                                start = panelWidth * 0.38f,
-                                end = panelWidth * 0.38f
+                                start = panelW * 0.445f,
+                                end   = panelW * 0.409f
                             )
-                            .height(panelHeight * 0.068f)
+                            .height((panelH * 0.050f).coerceAtLeast(22.dp))
                     ) {
                         BasicTextField(
                             value = name,
@@ -120,12 +119,12 @@ fun LoginScreen(
                             textStyle = TextStyle(
                                 fontFamily = Baloo2,
                                 fontWeight = FontWeight.ExtraBold,
-                                fontSize = 14.sp,
-                                color = TextDark,
-                                textAlign = TextAlign.Center
+                                fontSize   = 11.sp,
+                                color      = TextDark,
+                                textAlign  = TextAlign.Center
                             ),
                             cursorBrush = SolidColor(TextDark),
-                            singleLine = true,
+                            singleLine  = true,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                             keyboardActions = KeyboardActions(onDone = {
                                 if (name.isNotBlank()) onSubmit(name.trim())
@@ -135,13 +134,22 @@ fun LoginScreen(
                                     modifier = Modifier.fillMaxSize(),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    // White cover hides the asset's "Enter Name..." pencil text
-                                    // so the user's typed name reads cleanly inside the rectangle
-                                    if (name.isNotEmpty()) {
+                                    if (name.isEmpty()) {
+                                        Text(
+                                            text       = "your name…",
+                                            fontFamily = Nunito,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize   = 10.sp,
+                                            color      = Color(0xFF9B8FAD),
+                                            textAlign  = TextAlign.Center,
+                                            modifier   = Modifier.fillMaxWidth()
+                                        )
+                                    } else {
+                                        // Lightly cover the lined paper so typed text reads cleanly
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxSize()
-                                                .background(Color.White)
+                                                .background(Color.White.copy(alpha = 0.80f))
                                         )
                                     }
                                     innerTextField()
@@ -150,45 +158,45 @@ fun LoginScreen(
                         )
                     }
 
-                    // Small gap so Start sits just under the Enter Name box,
-                    // above the character art at ~55% of panel
-                    Spacer(modifier = Modifier.height(panelHeight * 0.025f))
+                    Spacer(modifier = Modifier.height(panelH * 0.036f))
 
-                    // Start button — between Enter Name and the character drawings
                     Image(
                         painter = painterResource(id = R.drawable.btn_start),
                         contentDescription = "Start Adventure",
                         modifier = Modifier
-                            .width(panelWidth * 0.40f)
+                            .width(panelW * 0.28f)
                             .aspectRatio(START_BTN_ASPECT)
-                            .alpha(if (name.isNotBlank()) 1f else 0.5f)
+                            .alpha(if (name.isNotBlank()) 1f else 0.45f)
                             .clickable(
                                 enabled = name.isNotBlank(),
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null
-                            ) {
-                                if (name.isNotBlank()) onSubmit(name.trim())
-                            },
+                            ) { if (name.isNotBlank()) onSubmit(name.trim()) },
                         contentScale = ContentScale.Fit
                     )
                 }
             }
 
-            Text(
-                text = "← Back",
-                fontFamily = Nunito,
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp,
-                color = Color.White.copy(alpha = 0.85f),
+            // Back button — dark pill for readability on the bright background
+            Box(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(start = 18.dp, bottom = 14.dp)
+                    .background(Color.Black.copy(alpha = 0.28f), RoundedCornerShape(999.dp))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) { onBack() }
-                    .padding(8.dp)
-            )
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text       = "← Back",
+                    fontFamily = Nunito,
+                    fontWeight = FontWeight.Bold,
+                    fontSize   = 13.sp,
+                    color      = Color.White
+                )
+            }
         }
     }
 }

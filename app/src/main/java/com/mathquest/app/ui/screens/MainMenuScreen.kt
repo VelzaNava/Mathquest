@@ -12,15 +12,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,11 +38,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.mathquest.app.R
-import com.mathquest.app.ui.theme.Baloo2
 import com.mathquest.app.ui.theme.Nunito
-import com.mathquest.app.ui.theme.TextDark
 
 // Natural aspect ratios from the actual cropped PNG assets
 private const val BUTTON_ASPECT = 538f / 121f      // ≈ 4.45 — main wide buttons
@@ -72,7 +68,8 @@ fun MainMenuScreen(
             contentDescription = "Main Menu Background",
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (showSettings) Modifier.blur(14.dp) else Modifier),
+                // PERF: stable modifier chain; 0.dp is a no-op
+                .blur(if (showSettings) 14.dp else 0.dp),
             contentScale = ContentScale.Crop
         )
 
@@ -106,7 +103,7 @@ fun MainMenuScreen(
         }
 
         if (showProfile) {
-            ProfileDialog(
+            ProfileOverlay(
                 playerName = playerName,
                 onClose = { showProfile = false }
             )
@@ -181,7 +178,8 @@ private fun MainMenuControls(
                     .width(buttonWidth)
                     .aspectRatio(BUTTON_ASPECT)
                     .alpha(if (hasSavedProgress) 1f else 0.45f)
-                    .then(if (!hasSavedProgress) Modifier.blur(3.dp) else Modifier)
+                    // PERF: stable modifier chain; 0.dp blur is a no-op
+                    .blur(if (hasSavedProgress) 0.dp else 3.dp)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
@@ -250,50 +248,57 @@ fun ImageIconButton(
     )
 }
 
+// profile_card.png is 366×440 (aspect ≈ 0.832).
+// White strip starts at card y ≈ 68 % (separator line at row 295/440).
+private const val PROFILE_CARD_ASPECT = 366f / 440f
+private const val PROFILE_NAME_FRAC = 0.03f   // above the character's head
+
 @Composable
-private fun ProfileDialog(playerName: String, onClose: () -> Unit) {
-    Dialog(onDismissRequest = onClose) {
+fun ProfileOverlay(playerName: String, onClose: () -> Unit) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.60f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { onClose() },
+        contentAlignment = Alignment.Center
+    ) {
+        // Size the card so it fits comfortably — portrait card, ~55 % of screen height
+        val cardH = (maxHeight * 0.58f).coerceAtMost(380.dp)
+        val cardW = cardH * PROFILE_CARD_ASPECT
+
         Box(
             modifier = Modifier
-                .background(Color.White, RoundedCornerShape(20.dp))
-                .padding(24.dp)
+                .width(cardW)
+                .height(cardH)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { /* swallow touches so card tap doesn't close */ }
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    "Profile",
-                    fontFamily = Baloo2,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 24.sp,
-                    color = TextDark
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = if (playerName.isBlank())
-                        "No hero yet — tap Start Adventure"
-                    else
-                        "Hero: $playerName",
-                    fontFamily = Nunito,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp,
-                    color = TextDark,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(Modifier.height(16.dp))
-                Box(
-                    modifier = Modifier
-                        .background(Color(0xFF7C3AED), RoundedCornerShape(999.dp))
-                        .clickable { onClose() }
-                        .padding(horizontal = 24.dp, vertical = 10.dp)
-                ) {
-                    Text(
-                        "Close",
-                        fontFamily = Baloo2,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 16.sp,
-                        color = Color.White
-                    )
-                }
-            }
+            // Card image (player already composited on it)
+            Image(
+                painter = painterResource(id = R.drawable.profile_card),
+                contentDescription = "Player Card",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
+            )
+
+            // Player name floating on top of the character's head
+            val nameY = cardH * PROFILE_NAME_FRAC
+            Text(
+                text = if (playerName.isBlank()) "Hero" else playerName,
+                fontFamily = Nunito,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 14.sp,
+                color = Color.Black,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = nameY)
+            )
         }
     }
 }

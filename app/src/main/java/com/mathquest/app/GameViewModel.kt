@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.update
 data class GameState(
     val playerName: String = "",
     val hasSavedProgress: Boolean = false,
+    val currentLevel: Int = 0,   // 0 = earth, 1 = air, 2 = water
     val musicVolume: Float = 0.7f,
     val sfxVolume: Float = 0.7f
 )
@@ -26,10 +27,11 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
         if (saved != null) {
             _state.update {
                 it.copy(
-                    playerName = saved.playerName,
+                    playerName    = saved.playerName,
                     hasSavedProgress = true,
-                    musicVolume = saved.musicVolume,
-                    sfxVolume = saved.sfxVolume
+                    currentLevel  = saved.currentLevel,
+                    musicVolume   = saved.musicVolume,
+                    sfxVolume     = saved.sfxVolume
                 )
             }
         } else {
@@ -39,8 +41,14 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setPlayerName(name: String) {
-        _state.update { it.copy(playerName = name, hasSavedProgress = true) }
+        _state.update { it.copy(playerName = name, hasSavedProgress = true, currentLevel = 0) }
         saveManager.saveAdventureStart(name)
+    }
+
+    fun advanceLevel() {
+        val next = (_state.value.currentLevel + 1).coerceAtMost(2)
+        _state.update { it.copy(currentLevel = next) }
+        saveManager.saveLevel(next)
     }
 
     fun setMusicVolume(v: Float) {
@@ -55,10 +63,8 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
 
     fun resetForNewGame() {
         val currentMusic = _state.value.musicVolume
-        val currentSfx = _state.value.sfxVolume
-        _state.update {
-            GameState(musicVolume = currentMusic, sfxVolume = currentSfx)
-        }
+        val currentSfx   = _state.value.sfxVolume
+        _state.update { GameState(musicVolume = currentMusic, sfxVolume = currentSfx) }
         saveManager.clear()
         saveManager.saveAudio(currentMusic, currentSfx)
     }

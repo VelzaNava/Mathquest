@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -27,17 +27,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.mathquest.app.R
 import com.mathquest.app.ui.theme.Nunito
 import com.mathquest.app.ui.theme.TextDark
 import com.mathquest.app.ui.theme.TextMid
 
-private const val PANEL_ASPECT = 829f / 951f
-private const val SETTINGS_HOME_ASPECT = 105f / 95f
+// bg_settings.png is 829×951 (aspect ≈ 0.872, already portrait).
+// "SETTINGS" decorative title ends at ≈ 36.4 % of image height (y ≈ 346 px).
+// Slider rows and button are placed below that.
+private const val SETTINGS_PAPER_ASPECT = 829f / 951f   // ≈ 0.872
+private const val SETTINGS_HOME_ASPECT  = 105f / 95f
 
 @Composable
 fun SettingsOverlay(
@@ -47,119 +49,135 @@ fun SettingsOverlay(
     onSfxVolume: (Float) -> Unit,
     onClose: () -> Unit
 ) {
-    Dialog(
-        onDismissRequest = onClose,
-        properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
-            usePlatformDefaultWidth = false
-        )
+    // ──────────────────────────────────────────────────────────────────────
+    // Direct overlay — NO Dialog (same reason as PauseOverlay: Dialog injects
+    // a tight minWidth = screenWidth constraint that breaks child widths).
+    // Tapping the dark background closes the settings.
+    // ──────────────────────────────────────────────────────────────────────
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.55f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { onClose() },
+        contentAlignment = Alignment.Center
     ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.55f)),
-            contentAlignment = Alignment.Center
-        ) {
-            val panelHeight = (maxHeight * 0.92f).coerceAtMost(560.dp)
-            val panelWidth = (panelHeight * PANEL_ASPECT)
-                .coerceAtMost(maxWidth * 0.62f)
+        // Smart panel sizing: cap panelH so panelW never exceeds 92 % of screen.
+        // This guarantees panel aspect == image aspect → ContentScale.Fit fills
+        // the panel exactly with no vertical letterboxing.
+        val maxPanelHFromWidth = maxWidth * 0.92f / SETTINGS_PAPER_ASPECT
+        val panelH = (maxHeight * 0.90f)
+            .coerceAtMost(maxPanelHFromWidth)
+            .coerceAtMost(620.dp)
+        val panelW = panelH * SETTINGS_PAPER_ASPECT
 
-            Box(
+        // Slider geometry — pixel-verified boundaries:
+        //   Red margin line right edge: canvas x ≈ 217  → fraction 0.262 of image width
+        //   Paper right edge (safe):    canvas x ≈ 733  → fraction 0.884 of image width
+        //   Slider starts just AFTER the red line, ends just INSIDE the paper right edge.
+        val sliderStartX = panelW * 0.272f   // ≈ 8 dp past the red line
+        val sliderW      = panelW * 0.612f   // ends at ≈ 0.884 × W
+        val sliderH      = 16.dp             // compact — "make it smaller"
+
+        // Row top offsets:
+        //   row height ≈ 13 dp (label) + 16 dp (slider) = 29 dp → top = centreY − 14.5 dp
+        //   "SETTINGS" title ends at ≈ 36.4 % → Music row centre at 42 % gives ~5 % margin
+        val musicRowY = panelH * 0.42f - 15.dp
+        val sfxRowY   = panelH * 0.62f - 15.dp
+
+        // Home button
+        val btnH   = (panelH * 0.095f).coerceIn(46.dp, 72.dp)
+        val btnW   = btnH * SETTINGS_HOME_ASPECT
+        val btnTopY = panelH * 0.84f - btnH / 2f
+
+        Box(
+            modifier = Modifier
+                .width(panelW)
+                .height(panelH)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { /* swallow touches inside panel */ }
+        ) {
+            // ── Paper background ──────────────────────────────────────────
+            Image(
+                painter = painterResource(id = R.drawable.bg_settings),
+                contentDescription = "Settings Panel",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit   // exact fill — aspect matches
+            )
+
+            // ── Music slider row ──────────────────────────────────────────
+            SettingsSliderRow(
+                icon     = "🎵",
+                label    = "Music",
+                value    = musicVolume,
+                onChange = onMusicVolume,
                 modifier = Modifier
-                    .width(panelWidth)
-                    .height(panelHeight)
+                    .align(Alignment.TopStart)
+                    .offset(x = sliderStartX, y = musicRowY)
+                    .width(sliderW),
+                sliderH  = sliderH
+            )
+
+            // ── SFX slider row ────────────────────────────────────────────
+            SettingsSliderRow(
+                icon     = "🔊",
+                label    = "SFX",
+                value    = sfxVolume,
+                onChange = onSfxVolume,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(x = sliderStartX, y = sfxRowY)
+                    .width(sliderW),
+                sliderH  = sliderH
+            )
+
+            // ── Home / Close button ───────────────────────────────────────
+            Image(
+                painter = painterResource(id = R.drawable.btn_settings_home),
+                contentDescription = "Close Settings",
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(x = panelW / 2f - btnW / 2f, y = btnTopY)
+                    .height(btnH)
+                    .aspectRatio(SETTINGS_HOME_ASPECT)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
-                    ) { /* swallow */ }
-            ) {
-                // Paper note background — already contains "SETTINGS" title
-                Image(
-                    painter = painterResource(id = R.drawable.bg_settings),
-                    contentDescription = "Settings Panel",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
-
-                // Content overlay — INSIDE the paper interior, below baked-in title
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(
-                            start = panelWidth * 0.20f,
-                            end = panelWidth * 0.10f,
-                            top = panelHeight * 0.34f,    // below "SETTINGS" title
-                            bottom = panelHeight * 0.10f
-                        ),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
-                    // Sliders block (top of interior)
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(panelHeight * 0.025f)
-                    ) {
-                        CompactVolumeRow(
-                            iconEmoji = "🎵",
-                            label = "Music",
-                            value = musicVolume,
-                            onValueChange = onMusicVolume
-                        )
-                        CompactVolumeRow(
-                            iconEmoji = "🔊",
-                            label = "SFX",
-                            value = sfxVolume,
-                            onValueChange = onSfxVolume
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(panelHeight * 0.02f))
-
-                    // Big Home button
-                    Image(
-                        painter = painterResource(id = R.drawable.btn_settings_home),
-                        contentDescription = "Close Settings",
-                        modifier = Modifier
-                            .height((panelHeight * 0.13f).coerceIn(50.dp, 80.dp))
-                            .aspectRatio(SETTINGS_HOME_ASPECT)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) { onClose() },
-                        contentScale = ContentScale.Fit
-                    )
-                }
-            }
+                    ) { onClose() },
+                contentScale = ContentScale.Fit
+            )
         }
     }
 }
 
-/** Compact slider row that fits inside narrow paper panel area. */
+/** Emoji icon + label left, percentage right, slider below. */
 @Composable
-fun CompactVolumeRow(
-    iconEmoji: String,
+private fun SettingsSliderRow(
+    icon: String,
     label: String,
     value: Float,
-    onValueChange: (Float) -> Unit
+    onChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+    sliderH: Dp = 16.dp
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(0.dp)
-    ) {
+    Column(modifier = modifier) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = iconEmoji, fontSize = 14.sp)
+                Text(text = icon, fontSize = 13.sp)
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = label,
                     fontFamily = Nunito,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                    fontSize = 10.sp,
                     color = TextDark
                 )
             }
@@ -167,27 +185,27 @@ fun CompactVolumeRow(
                 text = "${(value * 100).toInt()}%",
                 fontFamily = Nunito,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 10.sp,
+                fontSize = 9.sp,
                 color = TextMid
             )
         }
         Slider(
-            value = value,
-            onValueChange = onValueChange,
-            valueRange = 0f..1f,
-            modifier = Modifier
+            value         = value,
+            onValueChange = onChange,
+            valueRange    = 0f..1f,
+            modifier      = Modifier
                 .fillMaxWidth()
-                .height(28.dp),
+                .height(sliderH),
             colors = SliderDefaults.colors(
-                thumbColor = Color(0xFF7C3AED),
-                activeTrackColor = Color(0xFFA78BFA),
+                thumbColor         = Color(0xFF7C3AED),
+                activeTrackColor   = Color(0xFFA78BFA),
                 inactiveTrackColor = Color(0xFFE9D5FF)
             )
         )
     }
 }
 
-/** Original taller volume row, kept for any non-paper contexts. */
+/** Taller volume row — kept for any non-paper overlay contexts. */
 @Composable
 fun VolumeRow(
     iconEmoji: String,
@@ -224,13 +242,13 @@ fun VolumeRow(
             )
         }
         Slider(
-            value = value,
+            value         = value,
             onValueChange = onValueChange,
-            valueRange = 0f..1f,
-            modifier = Modifier.fillMaxWidth(),
-            colors = SliderDefaults.colors(
-                thumbColor = Color(0xFF7C3AED),
-                activeTrackColor = Color(0xFFA78BFA),
+            valueRange    = 0f..1f,
+            modifier      = Modifier.fillMaxWidth(),
+            colors        = SliderDefaults.colors(
+                thumbColor         = Color(0xFF7C3AED),
+                activeTrackColor   = Color(0xFFA78BFA),
                 inactiveTrackColor = Color(0xFFE9D5FF)
             )
         )
