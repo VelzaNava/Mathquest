@@ -109,11 +109,11 @@ internal fun LessonScreen(
             contentScale = ContentScale.Crop
         )
 
-        // Lesson card — compact square-ish box, truly centred on screen
+        // Lesson card — centred on screen
         Box(
             modifier = Modifier
                 .align(Alignment.Center)
-                .fillMaxWidth(0.54f),        // caps width so card doesn't stretch wall-to-wall
+                .fillMaxWidth(0.54f),
         ) {
             LessonCard(
                 step = step,
@@ -124,22 +124,18 @@ internal fun LessonScreen(
             )
         }
 
-        // Teacher (left side, bottom-anchored) — rendered after card so she stands in front
-        // Container at 52% keeps her proportional; the character itself only occupies the left ~26% of the canvas
-        Box(
+        // Teacher — fills the full screen height from bottom to top, anchored to the left edge.
+        // Uses the same FillHeight + BottomStart pattern as fight_player_card so the character
+        // always spans the full screen height regardless of resolution.
+        Image(
+            painter = painterResource(teacherRes),
+            contentDescription = "Teacher",
             modifier = Modifier
-                .fillMaxHeight()
-                .fillMaxWidth(0.52f)
+                .fillMaxSize()
                 .align(Alignment.BottomStart),
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            Image(
-                painter = painterResource(teacherRes),
-                contentDescription = "Teacher",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
-            )
-        }
+            contentScale = ContentScale.FillHeight,
+            alignment = Alignment.BottomStart
+        )
     }
 }
 

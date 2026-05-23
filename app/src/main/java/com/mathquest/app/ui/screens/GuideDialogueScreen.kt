@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -136,7 +137,7 @@ fun GuideDialogueScreen(onComplete: () -> Unit) {
             contentScale = ContentScale.Crop
         )
 
-        // ── Guide sprite ─────────────────────────────────────────────────
+        // ── Guide sprite — original size, pushed down to hide bottom transparency ───
         if (showSprite) {
             val spriteH = if (isLandscape) maxHeight * 0.72f else maxHeight * 0.40f
             Image(
@@ -146,7 +147,7 @@ fun GuideDialogueScreen(onComplete: () -> Unit) {
                     .height(spriteH.coerceAtMost(420.dp))
                     .align(if (isLandscape) Alignment.BottomStart else Alignment.TopCenter)
                     .then(
-                        if (isLandscape) Modifier.padding(start = 12.dp)
+                        if (isLandscape) Modifier.offset(x = -maxWidth * 0.03f, y = maxHeight * 0.16f)
                         else Modifier.padding(top = 8.dp)
                     ),
                 contentScale = ContentScale.Fit
