@@ -109,11 +109,18 @@ internal fun LessonScreen(
             contentScale = ContentScale.Crop
         )
 
-        // Lesson card — centred on screen
+        // Lesson card — centred, capped so it doesn't stretch on wide tablets
+        val cardFraction = (sw / 1f).let {
+            when {
+                sw >= 840.dp -> 0.42f   // large tablet
+                sw >= 600.dp -> 0.50f   // small tablet
+                else         -> 0.54f   // phone
+            }
+        }
         Box(
             modifier = Modifier
                 .align(Alignment.Center)
-                .fillMaxWidth(0.54f),
+                .fillMaxWidth(cardFraction),
         ) {
             LessonCard(
                 step = step,
@@ -168,7 +175,7 @@ internal fun LessonCard(
                 "Teacher",
                 fontFamily = Baloo2,
                 fontWeight = FontWeight.ExtraBold,
-                fontSize = 14.sp,
+                fontSize = 14.asp(),
                 color = Color.White
             )
         }
@@ -209,7 +216,7 @@ internal fun LessonCard(
                     text = if (step is LessonStep.Finale) "Continue Adventure!" else "Continue  ▶",
                     fontFamily = Baloo2,
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = 14.sp,
+                    fontSize = 14.asp(),
                     color = Color.White
                 )
             }
@@ -224,7 +231,7 @@ private fun LessonNarration(text: String) {
         text = text,
         fontFamily = Nunito,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 15.sp,
+        fontSize = 15.asp(),
         lineHeight = 24.sp,
         color = ChalkInk
     )
@@ -241,7 +248,7 @@ private fun LessonQuiz(
         text = step.question,
         fontFamily = Nunito,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 15.sp,
+        fontSize = 15.asp(),
         lineHeight = 24.sp,
         color = ChalkInk
     )
@@ -276,7 +283,7 @@ private fun LessonQuiz(
                 text = choice.label,
                 fontFamily = Baloo2,
                 fontWeight = FontWeight.ExtraBold,
-                fontSize = 16.sp,
+                fontSize = 16.asp(),
                 color = Color.White,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
@@ -291,7 +298,7 @@ private fun LessonQuiz(
             text = chosen.feedback,
             fontFamily = Nunito,
             fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
+            fontSize = 14.asp(),
             color = if (chosen.correct) CorrectGreen else WrongRed,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()

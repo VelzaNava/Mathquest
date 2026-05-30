@@ -210,14 +210,14 @@ private fun PauseSliderRow(
                 text = label,
                 fontFamily = Nunito,
                 fontWeight = FontWeight.Bold,
-                fontSize = 10.sp,
+                fontSize = 10.asp(),
                 color = TextDark
             )
             Text(
                 text = "${(value * 100).toInt()}%",
                 fontFamily = Nunito,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 9.sp,
+                fontSize = 9.asp(),
                 color = TextMid
             )
         }

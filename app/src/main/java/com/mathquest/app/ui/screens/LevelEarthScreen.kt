@@ -10,11 +10,14 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -26,9 +29,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -43,12 +43,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -102,11 +100,18 @@ fun LevelEarthScreen(
 
     var questionIndex by remember(restartKey) { mutableIntStateOf(0) }
     var hearts        by remember(restartKey) { mutableIntStateOf(MAX_HEARTS) }
-    var answerText    by remember(restartKey) { mutableStateOf("") }
     var won           by remember(restartKey) { mutableStateOf(false) }
     var lost          by remember(restartKey) { mutableStateOf(false) }
     var hintsLeft     by remember(restartKey) { mutableIntStateOf(3) }
     var showHint      by remember { mutableStateOf(false) }
+
+    // Pokémon-style multiple-choice state
+    var selectedChoice by remember(restartKey, questionIndex) { mutableStateOf<Int?>(null) }
+    var locked         by remember(restartKey, questionIndex) { mutableStateOf(false) }
+    var correctTick    by remember(restartKey) { mutableIntStateOf(0) }
+    var wrongTick      by remember(restartKey) { mutableIntStateOf(0) }
+    var flashOn        by remember { mutableStateOf(false) }
+    var monsterDying   by remember(restartKey) { mutableStateOf(false) }
 
     LaunchedEffect(restartKey) {
         monsterVisible = false
@@ -116,12 +121,38 @@ fun LevelEarthScreen(
     }
     LaunchedEffect(questionIndex) { showHint = false }
 
-    // Final boss: after pun shows for 2 s, fade the whole screen to black then hand off
+    // Correct answer → sharp hit flash (2 quick bursts), then advance / win
+    LaunchedEffect(correctTick) {
+        if (correctTick == 0) return@LaunchedEffect
+        repeat(2) {
+            flashOn = true
+            delay(35)
+            flashOn = false
+            delay(25)
+        }
+        if (questionIndex >= questions.lastIndex) won = true
+        else questionIndex += 1   // selectedChoice + locked auto-reset via remember key
+    }
+
+    // Wrong answer → keep the red highlight briefly, then unlock (or end the run)
+    LaunchedEffect(wrongTick) {
+        if (wrongTick == 0) return@LaunchedEffect
+        delay(450)
+        if (hearts <= 0) lost = true
+        else {
+            selectedChoice = null
+            locked = false
+        }
+    }
+
+    // On win: start the monster death fade for ALL levels, then handle routing
     LaunchedEffect(won) {
-        if (won && isFinalBoss) {
-            delay(2000)           // let the pun text sit for a moment
+        if (!won) return@LaunchedEffect
+        monsterDying = true          // monster fades out (1 200 ms)
+        if (isFinalBoss) {
+            delay(2000)              // let pun + fade run, then black-out and hand off
             triggerFadeOut = true
-            delay(1400)           // fade duration
+            delay(1400)
             onLevelComplete()
         }
     }
@@ -136,6 +167,20 @@ fun LevelEarthScreen(
         targetValue = if (monsterVisible) 1f else 0f,
         animationSpec = tween(900, easing = FastOutSlowInEasing),
         label = "monsterAlpha"
+    )
+
+    // White "hit" flash overlay alpha — snaps on instantly, drops off fast
+    val flashAlpha by animateFloatAsState(
+        targetValue = if (flashOn) 1f else 0f,
+        animationSpec = tween(20, easing = LinearEasing),
+        label = "hitFlash"
+    )
+
+    // Monster death fade — 0 = fully visible, going to 0 over 1 200 ms when dying
+    val monsterDeathAlpha by animateFloatAsState(
+        targetValue = if (monsterDying) 0f else 1f,
+        animationSpec = tween(1200, easing = LinearEasing),
+        label = "monsterDeath"
     )
 
     // PERF: only animate the monster bob during active combat. When paused / won /
@@ -165,19 +210,24 @@ fun LevelEarthScreen(
         if (won) punFor(currentLevel)
         else currentQuestion?.question.orEmpty()
 
-    fun submitAnswer() {
-        if (won || lost) return
+    fun chooseAnswer(idx: Int) {
+        if (won || lost || locked) return
         val q = currentQuestion ?: return
-        val typed = answerText.trim()
-        if (typed.isEmpty()) return
-        if (typed == q.answer) {
-            if (questionIndex >= questions.lastIndex) won = true
-            else questionIndex += 1
+        selectedChoice = idx
+        locked = true
+        if (q.choices.getOrNull(idx) == q.answer) {
+            correctTick += 1
         } else {
             hearts = (hearts - 1).coerceAtLeast(0)
-            if (hearts <= 0) lost = true
+            wrongTick += 1
         }
-        answerText = ""
+    }
+
+    // 0 = idle, 1 = chosen-correct (green), 2 = chosen-wrong (red)
+    fun choiceState(idx: Int): Int = when {
+        selectedChoice != idx -> 0
+        currentQuestion?.choices?.getOrNull(idx) == currentQuestion?.answer -> 1
+        else -> 2
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
@@ -196,42 +246,38 @@ fun LevelEarthScreen(
                 contentScale = ContentScale.Crop
             )
 
-            // Monster (centered)
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
+            // Monster — bigger now, and nudged toward the right side of the screen
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val monsterShiftX = maxWidth * 0.10f
+                val monsterModifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth(1.25f)
+                    .fillMaxHeight(1.25f)
+                    // PERF: lambda-offset reads bobY in the LAYOUT phase, not the
+                    // composition phase — saves an entire screen recomposition per frame
+                    .offset { IntOffset(monsterShiftX.roundToPx(), bobY.dp.roundToPx()) }
+
                 Image(
                     painter = painterResource(id = monsterRes),
                     contentDescription = "${currentLevel.monsterName()} Monster",
-                    modifier = Modifier
-                        .fillMaxWidth(0.95f)
-                        .fillMaxHeight(0.95f)
-                        // PERF: lambda-offset reads bobY in the LAYOUT phase, not the
-                        // composition phase — saves an entire screen recomposition per frame
-                        .offset { IntOffset(0, bobY.dp.roundToPx()) }
-                        .alpha(monsterAlpha),
+                    modifier = monsterModifier.alpha(monsterAlpha * monsterDeathAlpha),
                     contentScale = ContentScale.Fit
                 )
+
+                // White hit-flash — same sprite tinted white, fades in/out on a correct hit
+                // Also inherits the death alpha so it doesn't linger after the monster dies
+                if (flashAlpha > 0.01f) {
+                    Image(
+                        painter = painterResource(id = monsterRes),
+                        contentDescription = null,
+                        modifier = monsterModifier.alpha(flashAlpha * monsterDeathAlpha),
+                        contentScale = ContentScale.Fit,
+                        colorFilter = ColorFilter.tint(Color.White)
+                    )
+                }
             }
 
-            // Answer box (hidden after monster defeated)
-            if (!won && !lost) {
-                Image(
-                    painter = painterResource(id = R.drawable.fight_answer_box),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
-            }
-
-            // Dialogue box (always visible)
-            Image(
-                painter = painterResource(id = R.drawable.fight_dialogue_box),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
-            )
+            // (Answer box image removed — replaced by the 2×2 multiple-choice buttons)
 
             // Player card — FillHeight + BottomStart pins it to the very bottom-left corner
             // (eliminates the horizontal letterbox that ContentScale.Fit adds on wide screens)
@@ -243,14 +289,8 @@ fun LevelEarthScreen(
                 contentScale = ContentScale.FillHeight
             )
 
-            // Submit + hint buttons (active during combat)
+            // Hint button graphic (kept — submit button removed)
             if (!won && !lost) {
-                Image(
-                    painter = painterResource(id = R.drawable.fight_submit_btn),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
                 Image(
                     painter = painterResource(id = R.drawable.fight_hint_btn),
                     contentDescription = null,
@@ -279,14 +319,15 @@ fun LevelEarthScreen(
                 val heartBarY = remember(cardScale, barH) { 982.dp * cardScale - barH / 2f }
                 val hintBarY  = remember(cardScale, barH) { 1036.dp * cardScale - barH / 2f }
 
-                // Question / pun — strictly inside dialogue box
-                // Canvas bounds: x 24.2%–75.8% (51.6% wide), y 0%–18% tall
+                // Question dialogue box — moved to the LEFT side, clear of the monster.
                 Box(
                     modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .size(width = w * 0.50f, height = h * 0.175f)
-                        .clip(androidx.compose.ui.graphics.RectangleShape) // hard clip — text cannot escape
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                        .align(Alignment.TopStart)
+                        .padding(start = w * 0.04f, top = h * 0.08f)
+                        .width(w * 0.40f)
+                        .background(Color(0xF2FFF8EE), RoundedCornerShape(22.dp))
+                        .border(4.dp, Color(0xFFD4A76A), RoundedCornerShape(22.dp))
+                        .padding(horizontal = 22.dp, vertical = 18.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -294,10 +335,10 @@ fun LevelEarthScreen(
                         fontFamily = Baloo2,
                         fontWeight = FontWeight.ExtraBold,
                         // Pun text is longer so use a smaller size when won
-                        fontSize = if (won) 16.sp else 24.sp,
+                        fontSize = if (won) 18.asp() else 22.asp(),
                         color = Color(0xFF1E1B4B),
                         textAlign = TextAlign.Center,
-                        maxLines = 3,
+                        maxLines = 5,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
@@ -314,7 +355,7 @@ fun LevelEarthScreen(
                         text = playerName.ifBlank { "Hero" },
                         fontFamily = Baloo2,
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = 11.sp,
+                        fontSize = 11.asp(),
                         color = Color(0xFF1E1B4B),
                         textAlign = TextAlign.Center,
                         maxLines = 1
@@ -358,47 +399,36 @@ fun LevelEarthScreen(
                 }
 
                 if (!won && !lost) {
-                    // Answer input field
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .offset(x = w * 0.55f, y = h * 0.760f)
-                            .size(width = w * 0.30f, height = h * 0.060f),
-                        contentAlignment = Alignment.BottomStart
-                    ) {
-                        BasicTextField(
-                            value = answerText,
-                            onValueChange = { new ->
-                                answerText = new.filter { it.isDigit() }.take(6)
-                            },
-                            textStyle = TextStyle(
-                                fontFamily = Baloo2,
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 24.sp,
-                                color = Color(0xFF1E1B4B),
-                                textAlign = TextAlign.Start
-                            ),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Number,
-                                imeAction = ImeAction.Done
-                            ),
-                            keyboardActions = KeyboardActions(onDone = { submitAnswer() }),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    // Submit hotspot
-                    Box(
+                    // 2×2 multiple-choice grid (Pokémon-style) — bottom-right, clear of the player card
+                    Column(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .padding(bottom = h * 0.075f)
-                            .size(width = w * 0.18f, height = h * 0.10f)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) { submitAnswer() }
-                    )
+                            .fillMaxWidth()
+                            .padding(start = w * 0.30f, end = w * 0.04f, bottom = h * 0.045f),
+                        verticalArrangement = Arrangement.spacedBy(h * 0.018f)
+                    ) {
+                        val q = currentQuestion
+                        if (q != null) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(w * 0.02f)
+                            ) {
+                                AnswerButton(q.choices.getOrElse(0) { "" }, choiceState(0), !locked,
+                                    Modifier.weight(1f).height(h * 0.085f)) { chooseAnswer(0) }
+                                AnswerButton(q.choices.getOrElse(1) { "" }, choiceState(1), !locked,
+                                    Modifier.weight(1f).height(h * 0.085f)) { chooseAnswer(1) }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(w * 0.02f)
+                            ) {
+                                AnswerButton(q.choices.getOrElse(2) { "" }, choiceState(2), !locked,
+                                    Modifier.weight(1f).height(h * 0.085f)) { chooseAnswer(2) }
+                                AnswerButton(q.choices.getOrElse(3) { "" }, choiceState(3), !locked,
+                                    Modifier.weight(1f).height(h * 0.085f)) { chooseAnswer(3) }
+                            }
+                        }
+                    }
 
                     // Hint button tap hotspot — button sits at ~49–76% x, 65–75% y of the canvas
                     Box(
@@ -434,7 +464,7 @@ fun LevelEarthScreen(
                                 text = "Hint",
                                 fontFamily = Baloo2,
                                 fontWeight = FontWeight.ExtraBold,
-                                fontSize = 14.sp,
+                                fontSize = 14.asp(),
                                 color = Color(0xFF92400E)
                             )
                             Spacer(Modifier.height(6.dp))
@@ -442,7 +472,7 @@ fun LevelEarthScreen(
                                 text = currentQuestion.hint,
                                 fontFamily = Baloo2,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
+                                fontSize = 13.asp(),
                                 color = Color(0xFF1E1B4B),
                                 textAlign = TextAlign.Start
                             )
@@ -462,7 +492,7 @@ fun LevelEarthScreen(
                                     text = "Got it",
                                     fontFamily = Baloo2,
                                     fontWeight = FontWeight.ExtraBold,
-                                    fontSize = 13.sp,
+                                    fontSize = 13.asp(),
                                     color = Color.White
                                 )
                             }
@@ -487,24 +517,24 @@ fun LevelEarthScreen(
                         contentScale = ContentScale.Fit
                     )
                 }
-            }
 
-            // Pause button — top-right (hidden once the game is won or lost)
-            if (!won && !lost) {
-                Image(
-                    painter = painterResource(id = R.drawable.btn_pause),
-                    contentDescription = "Pause",
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 14.dp, end = 14.dp)
-                        .height(64.dp)
-                        .aspectRatio(PAUSE_ICON_ASPECT)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) { isPaused = true },
-                    contentScale = ContentScale.Fit
-                )
+                // Pause button — top-right (hidden once the game is won or lost)
+                if (!won && !lost) {
+                    Image(
+                        painter = painterResource(id = R.drawable.btn_pause),
+                        contentDescription = "Pause",
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 14.dp, end = 14.dp)
+                            .height(h * 0.12f)
+                            .aspectRatio(PAUSE_ICON_ASPECT)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) { isPaused = true },
+                        contentScale = ContentScale.Fit
+                    )
+                }
             }
 
             // Defeat overlay
@@ -520,7 +550,7 @@ fun LevelEarthScreen(
                             text = "Defeated…",
                             fontFamily = Baloo2,
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = 56.sp,
+                            fontSize = 56.asp(),
                             color = Color(0xFFFF6B6B)
                         )
                         Spacer(Modifier.height(18.dp))
@@ -537,7 +567,7 @@ fun LevelEarthScreen(
                                 text = "Try Again",
                                 fontFamily = Baloo2,
                                 fontWeight = FontWeight.ExtraBold,
-                                fontSize = 18.sp,
+                                fontSize = 18.asp(),
                                 color = Color.White
                             )
                         }
@@ -569,6 +599,46 @@ fun LevelEarthScreen(
                 restartKey++
             },
             onHome = onHome
+        )
+    }
+}
+
+// ── One multiple-choice answer button (Pokémon-style) ──────────────────────────
+// state: 0 = idle, 1 = chosen & correct (green), 2 = chosen & wrong (red)
+@Composable
+private fun AnswerButton(
+    text: String,
+    state: Int,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val bg = when (state) {
+        1 -> Color(0xFF16A34A)    // correct → green
+        2 -> Color(0xFFDC2626)    // wrong → red
+        else -> Color(0xF2FFF8EE) // idle → parchment
+    }
+    val fg = if (state == 0) Color(0xFF1E1B4B) else Color.White
+    Box(
+        modifier = modifier
+            .background(bg, RoundedCornerShape(16.dp))
+            .border(3.dp, Color(0xFFD4A76A), RoundedCornerShape(16.dp))
+            .clickable(
+                enabled = enabled,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { onClick() }
+            .padding(horizontal = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            fontFamily = Baloo2,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 26.asp(),
+            color = fg,
+            textAlign = TextAlign.Center,
+            maxLines = 1
         )
     }
 }

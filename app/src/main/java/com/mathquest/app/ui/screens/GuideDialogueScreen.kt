@@ -155,13 +155,14 @@ fun GuideDialogueScreen(onComplete: () -> Unit) {
         }
 
         // ── Dialogue box area ─────────────────────────────────────────────
-        val boxStartPad = if (isLandscape && showSprite) (maxWidth * 0.30f).coerceAtLeast(180.dp) else 16.dp
+        val boxStartPad = if (isLandscape && showSprite) (maxWidth * 0.28f).coerceAtLeast(160.dp) else 16.dp
+        val boxEndPad   = if (isLandscape) (maxWidth * 0.05f).coerceAtLeast(16.dp) else 16.dp
 
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(start = boxStartPad, end = 16.dp, bottom = 14.dp)
+                .padding(start = boxStartPad, end = boxEndPad, bottom = 14.dp)
         ) {
             Column {
                 // Speaker name tag
@@ -175,7 +176,7 @@ fun GuideDialogueScreen(onComplete: () -> Unit) {
                         text = line.speaker,
                         fontFamily = Baloo2,
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = 15.sp,
+                        fontSize = 15.asp(),
                         color = Color.White
                     )
                 }
@@ -201,7 +202,7 @@ fun GuideDialogueScreen(onComplete: () -> Unit) {
                                 text = line.text,
                                 fontFamily = Nunito,
                                 fontWeight = FontWeight.SemiBold,
-                                fontSize = 15.sp,
+                                fontSize = 15.asp(),
                                 lineHeight = 23.sp,
                                 color = TextInk,
                                 modifier = Modifier.weight(1f)
@@ -209,7 +210,7 @@ fun GuideDialogueScreen(onComplete: () -> Unit) {
                             Text(
                                 text = "▶",
                                 color = BoxBorder,
-                                fontSize = 13.sp,
+                                fontSize = 13.asp(),
                                 modifier = Modifier.padding(start = 10.dp)
                             )
                         }
@@ -223,7 +224,7 @@ fun GuideDialogueScreen(onComplete: () -> Unit) {
                                 text = "Are you ready, Explorer?",
                                 fontFamily = Nunito,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
+                                fontSize = 15.asp(),
                                 color = TextInk,
                                 textAlign = TextAlign.Center
                             )
@@ -267,7 +268,7 @@ private fun DialogueChoiceButton(label: String, color: Color, onClick: () -> Uni
             text = label,
             fontFamily = Baloo2,
             fontWeight = FontWeight.ExtraBold,
-            fontSize = 16.sp,
+            fontSize = 16.asp(),
             color = Color.White
         )
     }

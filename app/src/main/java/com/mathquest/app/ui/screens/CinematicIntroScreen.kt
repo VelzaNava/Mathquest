@@ -116,7 +116,7 @@ fun CinematicIntroScreen(onComplete: () -> Unit) {
                     text = subtitle,
                     fontFamily = Nunito,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
+                    fontSize = 18.asp(),
                     color = Color.White,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()

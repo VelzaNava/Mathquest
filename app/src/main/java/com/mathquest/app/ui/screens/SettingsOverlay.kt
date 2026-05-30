@@ -171,13 +171,13 @@ private fun SettingsSliderRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = icon, fontSize = 13.sp)
+                Text(text = icon, fontSize = 13.asp())
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = label,
                     fontFamily = Nunito,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 10.sp,
+                    fontSize = 10.asp(),
                     color = TextDark
                 )
             }
@@ -185,7 +185,7 @@ private fun SettingsSliderRow(
                 text = "${(value * 100).toInt()}%",
                 fontFamily = Nunito,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 9.sp,
+                fontSize = 9.asp(),
                 color = TextMid
             )
         }
@@ -223,13 +223,13 @@ fun VolumeRow(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = iconEmoji, fontSize = 20.sp)
+                Text(text = iconEmoji, fontSize = 20.asp())
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = label,
                     fontFamily = Nunito,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
+                    fontSize = 16.asp(),
                     color = TextDark
                 )
             }
@@ -237,7 +237,7 @@ fun VolumeRow(
                 text = "${(value * 100).toInt()}%",
                 fontFamily = Nunito,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp,
+                fontSize = 13.asp(),
                 color = TextMid
             )
         }

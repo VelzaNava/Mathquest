@@ -94,7 +94,7 @@ fun CreditsScreen(
                 text       = "Return to Main Menu",
                 fontFamily = Baloo2,
                 fontWeight = FontWeight.ExtraBold,
-                fontSize   = 20.sp,
+                fontSize   = 20.asp(),
                 color      = Color.White
             )
         }
